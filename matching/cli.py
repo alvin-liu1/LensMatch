@@ -25,7 +25,7 @@ def run(input_path=None, a=None, b=None, output=None, config=None):
     if not modules:
         reason = invalid[0]["原因"] if invalid else "请核对输入"
         if config.use_score and any("Score缺失" in row["原因"] for row in invalid):
-            reason += "。如果原始数据只有MTF，请在界面选择‘MTF 均值’来源；也可以取消启用Score"
+            reason += "。如果原始数据只有MTF，请在界面选择‘MTF 均值’来源，并补齐Block3_H和Block4_H"
         raise ValueError("没有有效模组。" + reason)
     if config.mode == "mixed-imu" and not a and any("IMU" in row["原因"] for row in invalid):
         raise ValueError("混配输入中存在缺失/非法IMU标记；请指定 --a 带IMU输入 --b 无IMU输入，或补齐IMU_Flag")

@@ -22,7 +22,7 @@ class Config:
     rg_limit: float = 10
     bg_limit: float = 10
     score_limit: float = 6.8
-    use_score: bool = False
+    use_score: bool = True
     score_source: str = "block-average"
     weights: dict = field(default_factory=lambda: {"aec": 0, "rg": 0.5, "bg": 0.5, "score": 0})
 

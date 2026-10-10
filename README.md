@@ -26,7 +26,7 @@ python match.py --mode mixed-imu --a examples/mixed/A.csv --b examples/mixed/B.c
 ## 匹配规则
 
 - 默认硬阈值：ΔAEC ≤ 1，ΔR/G ≤ 10，ΔB/G ≤ 10；不自动放宽。
-- Score 定义为 `(Block3_H + Block4_H) / 2`，自动计算；可启用 ΔScore ≤ 6.8 的条件。
+- Score 定义为 `(Block3_H + Block4_H) / 2`，默认启用 ΔScore ≤ 6.8 的条件；客户界面无需勾选。
 - 先最大化配对数量，再最小化总归一化成本；默认优化色彩差异。
 - 一般图使用 Blossom；混配及 A/B 输入使用最大二分匹配与最小费用流。
 - 阈值和权重通过 `config.json` 调整。

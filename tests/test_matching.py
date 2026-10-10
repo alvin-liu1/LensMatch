@@ -30,11 +30,20 @@ def brute_force(modules, config, remaining=None):
 
 
 class AlgorithmTests(unittest.TestCase):
+    def test_default_score_is_enabled(self):
+        config = Config()
+        self.assertTrue(config.use_score)
+        self.assertEqual(config.score_source, "block-average")
+        self.assertTrue(json.loads((ROOT / "config.json").read_text(encoding="utf-8"))["use_score"])
+        modules = [Module("a", 0, 10, 10, 0, score=40), Module("b", 0, 10, 10, 0, score=47)]
+        self.assertEqual(solve(modules, config)[0], [])
+        self.assertEqual(len(solve(modules, Config(use_score=False))[0]), 1)
+
     def test_exact_against_enumeration_in_both_modes_and_ab(self):
         rng = random.Random(42)
         for mode, grouped in [("no-imu", False), ("mixed-imu", False), ("no-imu", True), ("mixed-imu", True)]:
             for _ in range(25):
-                config = Config(mode=mode, weights={"aec": .2, "rg": .4, "bg": .4, "score": 0})
+                config = Config(mode=mode, use_score=False, weights={"aec": .2, "rg": .4, "bg": .4, "score": 0})
                 modules = [Module(str(i), rng.randint(0, 3), rng.randint(0, 20), rng.randint(0, 20),
                                   int(i < 4) if mode == "mixed-imu" else 0,
                                   "A" if i < 4 else "B" if grouped else "pool") for i in range(8)]
@@ -52,11 +61,11 @@ class AlgorithmTests(unittest.TestCase):
         self.assertEqual(len(solve(modules, Config(use_score=True))[0]), 1)
         self.assertEqual(len(solve(modules, Config(use_score=True, score_limit=6.7))[0]), 0)
         modules[1] = Module("b", 2.001, 10, 10, 0)
-        self.assertEqual(solve(modules, Config())[0], [])
+        self.assertEqual(solve(modules, Config(use_score=False))[0], [])
 
     def test_cardinality_beats_one_perfect_pair(self):
         modules = [Module(str(i), 0, rg, 0, 0) for i, rg in enumerate([0, 10, 10, 20])]
-        pairs, _, _ = solve(modules, Config())
+        pairs, _, _ = solve(modules, Config(use_score=False))
         self.assertEqual(len(pairs), 2)
 
     def test_config_rejects_nonfinite_and_invalid_limits(self):
@@ -64,7 +73,7 @@ class AlgorithmTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 Config(aec_limit=value)
         with self.assertRaises(ValueError):
-            Config(weights={"aec": 0, "rg": 0, "bg": 0, "score": 1})
+            Config(use_score=False, weights={"aec": 0, "rg": 0, "bg": 0, "score": 1})
 
 
 class InputTests(unittest.TestCase):
@@ -76,21 +85,21 @@ class InputTests(unittest.TestCase):
     def test_missing_numeric_is_invalid_not_zero(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = self.make_table(tmp, "data.csv", "SN,AEC,R/G,B/G\na,1,10,10\nb,,10,10\nc,inf,10,10\n")
-            modules, invalid, _ = prepare([(p, "pool", 0)], Config())
+            modules, invalid, _ = prepare([(p, "pool", 0)], Config(use_score=False))
             self.assertEqual([m.sn for m in modules], ["a"])
             self.assertEqual(len(invalid), 2)
 
     def test_imu_is_explicit_and_conflicts_not_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = self.make_table(tmp, "data.csv", "SN,AEC,R/G,B/G,IMU_Flag\na,1,10,10,\nb,1,10,10,1\nc,1,10,10,0.5\n")
-            mods, invalid, _ = prepare([(p, "pool", None)], Config(mode="mixed-imu"))
+            mods, invalid, _ = prepare([(p, "pool", None)], Config(mode="mixed-imu", use_score=False))
             self.assertEqual([m.sn for m in mods], ["b"])
             self.assertEqual(len(invalid), 2)
-            mods, invalid, _ = prepare([(p, "A", 1)], Config(mode="mixed-imu"))
+            mods, invalid, _ = prepare([(p, "A", 1)], Config(mode="mixed-imu", use_score=False))
             self.assertEqual(len(mods), 2)
             self.assertEqual(len(invalid), 1)
             with self.assertRaises(ValueError):
-                run(input_path=p, output=tmp, config=Config(mode="mixed-imu"))
+                run(input_path=p, output=tmp, config=Config(mode="mixed-imu", use_score=False))
 
     def test_conflicting_retests_are_rejected(self):
         identical = pd.DataFrame({"SN.": ["a", "a"], "AEC": ["1", "1.0"]})
@@ -101,21 +110,21 @@ class InputTests(unittest.TestCase):
     def test_blank_rows_do_not_truncate_table(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = self.make_table(tmp, "data.csv", "SN,AEC,R/G,B/G\na,1,10,10\n\nb,1,10,10\n")
-            modules, _, _ = prepare([(p, "pool", 0)], Config())
+            modules, _, _ = prepare([(p, "pool", 0)], Config(use_score=False))
             self.assertEqual(len(modules), 2)
 
     def test_cross_group_duplicate_sn_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = self.make_table(tmp, "data.csv", "SN,AEC,R/G,B/G\na,1,10,10\n")
             with self.assertRaises(ValueError):
-                prepare([(p, "A", 0), (p, "B", 0)], Config())
+                prepare([(p, "A", 0), (p, "B", 0)], Config(use_score=False))
 
     def test_partial_sn_is_retained_as_invalid(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.make_table(tmp, "mtf.csv", "SN,Block3_H,Block4_H\na,40,40\nb,40,40\n")
             self.make_table(tmp, "aec.csv", "SN,AEC\na,1\nb,1\n")
             self.make_table(tmp, "awb.csv", "SN,R/G,B/G\na,10,10\n")
-            modules, invalid, _ = prepare([(tmp, "pool", 0)], Config())
+            modules, invalid, _ = prepare([(tmp, "pool", 0)], Config(use_score=False))
             self.assertEqual(len(modules), 1)
             self.assertEqual(invalid[0]["SN"], "b")
 
@@ -126,7 +135,7 @@ class InputTests(unittest.TestCase):
             self.assertEqual(len(invalid), 1)
             modules, invalid, _ = prepare([(p, "pool", 0)], Config(use_score=True))
             self.assertEqual(modules[0].score, 41)
-            modules, invalid, _ = prepare([(p, "pool", 0)], Config())
+            modules, invalid, _ = prepare([(p, "pool", 0)], Config(use_score=False))
             self.assertEqual(modules[0].score, 41)
             self.assertFalse(invalid)
             p.write_text("SN,AEC,R/G,B/G,Block3_H,Block4_H\na,1,10,10,40,\n", encoding="utf-8")
@@ -138,12 +147,12 @@ class InputTests(unittest.TestCase):
 class IntegrationTests(unittest.TestCase):
     @unittest.skipUnless((ROOT / "input/GC6603_AEC_Data_20261009.xls").exists() and (ROOT / "input/0922/GC6603_AEC_Data_20260922.xls").exists(), "本地产线数据未提供；公开仓库使用合成示例验证")
     def test_current_batch_and_historical_batch(self):
-        modules, invalid, _ = prepare([(ROOT / "input", "pool", 0)], Config())
+        modules, invalid, _ = prepare([(ROOT / "input", "pool", 0)], Config(use_score=False))
         self.assertEqual((len(modules), len(invalid)), (10, 0))
-        pairs, unpaired, _ = solve(modules, Config())
+        pairs, unpaired, _ = solve(modules, Config(use_score=False))
         self.assertEqual((len(pairs), len(unpaired)), (5, 0))
         self.assertEqual(sum(abs(modules[i].rg-modules[j].rg) + abs(modules[i].bg-modules[j].bg) for i,j in pairs), 21)
-        modules, invalid, _ = prepare([(ROOT / "input/0922", "pool", 0)], Config())
+        modules, invalid, _ = prepare([(ROOT / "input/0922", "pool", 0)], Config(use_score=False))
         self.assertTrue(modules)
         self.assertFalse(invalid)
 
@@ -151,7 +160,7 @@ class IntegrationTests(unittest.TestCase):
     def test_actual_mixed_imu_workbooks(self):
         sources = [(ROOT / "260604/带IMU_10PCS_20260602.xlsx", "A", 1),
                    (ROOT / "260604/不带IMU 10PCS_20260602.xlsx", "B", 0)]
-        config = Config(mode="mixed-imu")
+        config = Config(mode="mixed-imu", use_score=False)
         modules, invalid, _ = prepare(sources, config)
         self.assertEqual((len(modules), len(invalid)), (20, 0))
         pairs, _, _ = solve(modules, config)
@@ -189,7 +198,7 @@ class IntegrationTests(unittest.TestCase):
     def test_input_identifiers_are_not_excel_formulas(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "data.csv"
-            source.write_text("SN,AEC,R/G,B/G\n=1+1,1,10,10\nb,1,10,10\n", encoding="utf-8")
+            source.write_text("SN,AEC,R/G,B/G,Block3_H,Block4_H\n=1+1,1,10,10,40,40\nb,1,10,10,40,40\n", encoding="utf-8")
             target = run(input_path=source, output=Path(tmp) / "results")
             book = load_workbook(target, data_only=False)
             cells = [cell for row in book["Pairs"] for cell in row if cell.value == "=1+1"]

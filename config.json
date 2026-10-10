@@ -4,7 +4,7 @@
   "rg_limit": 10,
   "bg_limit": 10,
   "score_limit": 6.8,
-  "use_score": false,
+  "use_score": true,
   "score_source": "block-average",
   "weights": {"aec": 0, "rg": 0.5, "bg": 0.5, "score": 0}
 }
