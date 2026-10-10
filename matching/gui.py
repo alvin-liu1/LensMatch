@@ -41,13 +41,18 @@ def launch(config, input_path=None, a=None, b=None, output=None):
                 if path:
                     var.set(path)
             ttk.Button(panel, text="选文件", command=select_file).grid(row=row, column=3)
+    score = tk.BooleanVar(value=config.use_score)
     score_panel = ttk.Frame(panel)
     score_panel.grid(row=7, column=1, columnspan=3, sticky="ew", pady=8)
-    ttk.Label(score_panel, text=f"Score 已启用（差值阈值: {config.score_limit}）").pack(side="left")
+    ttk.Checkbutton(score_panel, text=f"启用 Score（差值阈值: {config.score_limit}）", variable=score).pack(side="left")
     sources = {"读取真实 Score 列": "column", "MTF 均值（Block3_H、Block4_H）": "block-average"}
     source = tk.StringVar(value=next(label for label, value in sources.items() if value == config.score_source))
     source_box = ttk.Combobox(score_panel, textvariable=source, values=list(sources), state="readonly", width=34)
     source_box.pack(side="left", padx=8)
+    def score_state(*_):
+        source_box.configure(state="readonly" if score.get() else "disabled")
+    score.trace_add("write", score_state)
+    score_state()
     ttk.Label(panel, text=f"阈值：ΔAEC ≤ {config.aec_limit}，ΔR/G ≤ {config.rg_limit}，ΔB/G ≤ {config.bg_limit}；可在 config.json 调整").grid(row=8, column=0, columnspan=4, sticky="w")
     status = tk.StringVar(value="混配：用 A/B 输入指定真实硬件类型，或在统一输入里提供 IMU_Flag。")
     ttk.Label(panel, textvariable=status, wraplength=740).grid(row=10, column=0, columnspan=4, sticky="w", pady=10)
@@ -55,7 +60,7 @@ def launch(config, input_path=None, a=None, b=None, output=None):
     last_result = [None]
 
     def start():
-        selected = replace(config, mode=mode.get(), use_score=True, score_source=sources[source.get()])
+        selected = replace(config, mode=mode.get(), use_score=score.get(), score_source=sources[source.get()])
         if split.get():
             if not variables["a"].get() or not variables["b"].get():
                 messagebox.showerror("输入不完整", "请指定 A 和 B 输入", parent=root)
