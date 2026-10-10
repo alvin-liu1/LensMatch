@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+output/
+~$*.xlsx
+input/*
+!input/.gitkeep
+260604/
+.claude/
+.codex/
+.agents/
