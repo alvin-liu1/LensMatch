@@ -6,6 +6,23 @@
 
 ## 快速开始
 
+### Windows 免安装桌面版
+
+同事使用 `LensMatch-Windows-x64.zip`：完整解压后双击 `LensMatch.exe`，无需安装 Python 或 Excel。界面支持选择文件/目录、两种配对模式、A/B 分组、Score 筛选、运行进度及结果统计。
+
+开发者在 Windows x64 + Python 3.12 环境构建：
+
+```powershell
+python -m pip install -r requirements-build.txt
+python build_windows.py
+```
+
+产物在 `dist/LensMatch-Windows-x64.zip`。包内包含配置、合成示例、中文说明和运行依赖，不包含产线数据。必须保留整个解压目录。配置、默认输入和输出均相对 exe 所在目录解析，建议解压到桌面等可写位置。
+
+也可在 GitHub Actions 手动运行 **Windows package**，下载同名构建产物。流程会先运行回归测试，再验证打包程序可完成示例配对并打开界面；只有通过后才上传 ZIP。Mac 不能交叉编译该 Windows 程序。
+
+### 源码运行
+
 需要 Python 3.10 或更新版本。
 
 ```powershell

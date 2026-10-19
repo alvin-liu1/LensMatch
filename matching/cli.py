@@ -8,7 +8,7 @@ from .data import prepare
 from .algorithm import solve
 from .report import export
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent
 
 
 def run(input_path=None, a=None, b=None, output=None, config=None):
@@ -70,7 +70,7 @@ def main(argv=None):
         if args.use_score or args.no_score:
             data["use_score"] = args.use_score
         config = Config(**data)
-        if args.gui:
+        if args.gui or (getattr(sys, "frozen", False) and not argv and len(sys.argv) == 1):
             from .gui import launch
             launch(config, args.input, args.a, args.b, args.output)
         else:

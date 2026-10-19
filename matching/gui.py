@@ -1,6 +1,9 @@
 """Small native interface; computation runs off the UI thread."""
 from dataclasses import replace
 import os
+import json
+import subprocess
+import sys
 import queue
 import threading
 import tkinter as tk
@@ -13,6 +16,9 @@ def launch(config, input_path=None, a=None, b=None, output=None):
     root.title("摄像头模组配对")
     root.geometry("900x560")
     root.minsize(900, 560)
+    style = ttk.Style(root)
+    if "vista" in style.theme_names():
+        style.theme_use("vista")
     panel = ttk.Frame(root, padding=20)
     panel.pack(fill="both", expand=True)
     panel.columnconfigure(1, weight=1)
@@ -58,8 +64,16 @@ def launch(config, input_path=None, a=None, b=None, output=None):
     ttk.Label(panel, textvariable=status, wraplength=740).grid(row=10, column=0, columnspan=4, sticky="w", pady=10)
     results = queue.Queue()
     last_result = [None]
+    progress = ttk.Progressbar(panel, mode="indeterminate")
+    progress.grid(row=11, column=0, columnspan=4, sticky="ew", pady=8)
 
     def start():
+        if not variables["output"].get().strip():
+            messagebox.showerror("输入不完整", "请选择结果保存目录", parent=root)
+            return
+        if not split.get() and not variables["input"].get().strip():
+            messagebox.showerror("输入不完整", "请选择统一输入文件或目录", parent=root)
+            return
         selected = replace(config, mode=mode.get(), use_score=score.get(), score_source=sources[source.get()])
         if split.get():
             if not variables["a"].get() or not variables["b"].get():
@@ -70,6 +84,8 @@ def launch(config, input_path=None, a=None, b=None, output=None):
             args = (variables["input"].get(), None, None)
         output_dir = variables["output"].get()
         start_button.configure(state="disabled")
+        open_button.configure(state="disabled")
+        progress.start()
         status.set("正在读取、校验和匹配…")
         def worker():
             try:
@@ -85,9 +101,15 @@ def launch(config, input_path=None, a=None, b=None, output=None):
             root.after(100, poll)
             return
         start_button.configure(state="normal")
+        progress.stop()
         if ok:
             last_result[0] = result
-            status.set(f"匹配完成。结果：{result}；Pairs为配对清单，Invalid为无效数据。")
+            try:
+                summary = json.loads((result.parent / "summary.json").read_text(encoding="utf-8"))
+                counts = "，".join(f"{key}：{summary[key]}" for key in ["有效模组", "配对数", "未配对数", "无效模组"])
+            except (OSError, ValueError, KeyError):
+                counts = "结果已保存"
+            status.set(f"匹配完成。{counts}\n结果：{result}")
             open_button.configure(state="normal")
         else:
             status.set("匹配失败，请核对输入。")
@@ -98,7 +120,10 @@ def launch(config, input_path=None, a=None, b=None, output=None):
     start_button.grid(row=9, column=1, sticky="w", pady=12)
     def open_result():
         try:
-            os.startfile(str(last_result[0].parent))
+            if sys.platform == "win32":
+                os.startfile(str(last_result[0].parent))
+            else:
+                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(last_result[0].parent)])
         except OSError as exc:
             messagebox.showerror("打开失败", str(exc), parent=root)
     open_button = ttk.Button(panel, text="打开结果目录", state="disabled", command=open_result)

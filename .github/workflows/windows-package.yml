@@ -1,0 +1,39 @@
+name: Windows package
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - '**.py'
+      - 'requirements*.txt'
+      - '.github/workflows/windows-package.yml'
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - run: python -m pip install -r requirements-build.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python build_windows.py
+      - name: Verify bundled engine and GUI
+        shell: pwsh
+        run: |
+          $check = Start-Process -FilePath dist/LensMatch/LensMatch.exe -ArgumentList '--smoke-test', 'dist/smoke-output' -Wait -PassThru
+          if ($check.ExitCode -ne 0) { throw 'Packaged engine smoke test failed' }
+          $app = Start-Process -FilePath dist/LensMatch/LensMatch.exe -PassThru
+          Start-Sleep -Seconds 8
+          $app.Refresh()
+          if ($app.HasExited -or $app.MainWindowTitle -ne '摄像头模组配对') {
+            throw 'Packaged GUI did not open successfully'
+          }
+          Stop-Process -Id $app.Id
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LensMatch-Windows-x64
+          path: dist/LensMatch-Windows-x64.zip
+          if-no-files-found: error

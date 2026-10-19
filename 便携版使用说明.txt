@@ -1,0 +1,16 @@
+LensMatch 摄像头模组配对工具 · Windows 10/11 x64
+
+1. 将整个 ZIP 解压到有写入权限的本地目录，例如桌面。不要只取出 exe。
+2. 双击 LensMatch.exe，无需安装 Python 或 Excel。
+3. 选择真实业务模式，选择数据文件或目录；A/B 输入只进行跨组配对。
+4. 选择结果保存目录，点击“开始匹配”，完成后点击“打开结果目录”。
+5. 匹配结果.xlsx 中 Pairs 是配对清单，Unpaired 是未配对原因，Invalid 是无效数据。
+
+首次试用：统一输入选择 examples/noimu 目录，模式选择“两边都无 IMU”。
+混配示例：选择 A/B 输入，A 选 examples/mixed/A.csv，B 选 examples/mixed/B.csv。
+选择“A带 IMU，B无 IMU”，保持 Score 默认启用。
+
+阈值和权重位于 exe 同级的 config.json，修改后重新启动。
+每次运行单独保存结果，不覆盖历史结果。不要把旧结果放入原始输入目录。
+程序不会自动放宽阈值，缺失、冲突的数据需要核对原始测试记录。
+请保留 _internal 目录；移动程序时移动整个 LensMatch 文件夹。
