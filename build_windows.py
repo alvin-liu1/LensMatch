@@ -3,6 +3,9 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import json
+from datetime import datetime, timezone
+from matching import __version__
 
 
 def main():
@@ -16,6 +19,8 @@ def main():
         "desktop.py",
     ], cwd=root, check=True)
     target = root / "dist" / "LensMatch"
+    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True)
+    (target / "build-info.json").write_text(json.dumps({"version": __version__, "commit": revision.stdout.strip(), "built_at": datetime.now(timezone.utc).isoformat(), "python": sys.version}, ensure_ascii=False, indent=2), encoding="utf-8")
     shutil.copy2(root / "config.json", target)
     shutil.copy2(root / "便携版使用说明.txt", target)
     shutil.copytree(root / "examples", target / "examples", dirs_exist_ok=True)

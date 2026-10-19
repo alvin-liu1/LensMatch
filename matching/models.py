@@ -13,6 +13,7 @@ class Module:
     score: float | None = None
     block3: float | None = None
     block4: float | None = None
+    sources: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

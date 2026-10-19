@@ -3,15 +3,20 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 import json
+import shutil
+import tempfile
+from uuid import uuid4
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
-from .algorithm import differences, cost, explain_unpaired
+from . import __version__
+from .algorithm import differences, cost, explain_unpaired, DiagnosticIndex
 
 
 def module_row(module):
     return {"SN": module.sn, "Group": module.group, "IMU_Flag": module.imu,
             "AEC": module.aec, "R/G": module.rg, "B/G": module.bg,
-            "Score": module.score, "Block3_H": module.block3, "Block4_H": module.block4}
+            "Score": module.score, "Block3_H": module.block3, "Block4_H": module.block4,
+            "来源": "\n".join(module.sources)}
 
 
 def write_sheet(book, name, rows, empty_headers):
@@ -39,11 +44,22 @@ def write_sheet(book, name, rows, empty_headers):
     return sheet
 
 
-def export(output, modules, pairs, unpaired, graph, invalid, notes, config, sources):
+def export(output, modules, pairs, unpaired, graph, invalid, notes, config, sources, timings=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
-    run = output / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    run.mkdir(exist_ok=False)
+    staging = Path(tempfile.mkdtemp(prefix=".pending-", dir=output))
+    final = output / (datetime.now().strftime("%Y%m%d_%H%M%S_%f") + "_" + uuid4().hex[:8])
+    try:
+        _write_export(staging, modules, pairs, unpaired, graph, invalid, notes, config, sources, timings)
+        # Same-filesystem rename publishes the workbook and summary together.
+        staging.rename(final)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return final / "匹配结果.xlsx"
+
+
+def _write_export(run, modules, pairs, unpaired, graph, invalid, notes, config, sources, timings):
     book = Workbook()
     book.remove(book.active)
     pair_rows = []
@@ -56,7 +72,8 @@ def export(output, modules, pairs, unpaired, graph, invalid, notes, config, sour
                           **{f"{k}_A": v for k, v in module_row(a).items() if k not in {"SN", "IMU_Flag"}},
                           **{f"{k}_B": v for k, v in module_row(b).items() if k not in {"SN", "IMU_Flag"}}})
     write_sheet(book, "Pairs", pair_rows, ["Pair_ID", "SN_A", "SN_B", "IMU_Flag_A", "IMU_Flag_B", "Δaec", "Δrg", "Δbg", "Δscore", "归一化成本"])
-    write_sheet(book, "Unpaired", [{**module_row(modules[i]), **explain_unpaired(i, modules, graph, config)} for i in unpaired],
+    diagnostic_index = DiagnosticIndex(modules, config) if unpaired else None
+    write_sheet(book, "Unpaired", [{**module_row(modules[i]), **explain_unpaired(i, modules, graph, config, diagnostic_index)} for i in unpaired],
                 ["SN", "原因", "合格候选数", "最近候选SN"])
     write_sheet(book, "Invalid", invalid, ["SN", "Group", "来源", "原因"])
     write_sheet(book, "Data", [module_row(m) for m in modules], ["SN", "Group", "IMU_Flag", "AEC", "R/G", "B/G", "Score"])
@@ -66,7 +83,8 @@ def export(output, modules, pairs, unpaired, graph, invalid, notes, config, sour
                "成本精度": "每条边取整至1e-6，等价最优解可能有多个",
                "目标": "先最多配对，再最小总成本；严格阈值，不自动放宽",
                "输入": [{"path": str(Path(p).resolve()), "group": group, "assigned_imu": imu} for p, group, imu in sources],
-               "配置": asdict(config), "读取说明": notes}
+               "配置": asdict(config), "读取说明": notes, "阶段耗时秒": timings or {},
+               "状态": "complete", "版本": __version__}
     config_rows = [{"项目": k, "值": json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else v} for k, v in summary.items() if k != "读取说明"]
     config_rows.extend({"项目": "读取说明", "值": note} for note in notes)
     write_sheet(book, "Config", config_rows, ["项目", "值"])
