@@ -8,7 +8,9 @@ from .data import prepare
 from .algorithm import solve
 from .report import export
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = (Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
+       else Path(__file__).resolve().parent.parent)
+DEFAULT_CONFIG = Path(getattr(sys, "_MEIPASS", ROOT)) / "config.json"
 
 
 def run(input_path=None, a=None, b=None, output=None, config=None):
@@ -51,13 +53,15 @@ def load_config(path):
 
 
 def main(argv=None):
+    if argv is None and getattr(sys, "frozen", False) and len(sys.argv) == 1:
+        argv = ["--gui"]
     parser = argparse.ArgumentParser(description="摄像头模组一键提取与最优配对")
     parser.add_argument("--input", help="统一输入目录或文件；默认项目input目录，不递归读取历史子目录")
     parser.add_argument("--a", help="A组目录或文件；混配模式A必须带IMU")
     parser.add_argument("--b", help="B组目录或文件；B必须无IMU")
     parser.add_argument("--output", help="输出根目录，每次建立独立结果目录")
     parser.add_argument("--mode", choices=["no-imu", "mixed-imu"], default=None)
-    parser.add_argument("--config", default=str(ROOT / "config.json"))
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG))
     score = parser.add_mutually_exclusive_group()
     score.add_argument("--use-score", action="store_true")
     score.add_argument("--no-score", action="store_true")

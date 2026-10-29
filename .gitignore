@@ -9,3 +9,11 @@ input/*
 .claude/
 .codex/
 .agents/
+
+# Local build environments and PyInstaller intermediates
+.build-python*/
+build/
+*.spec
+
+dist/LensMatch/
+dist/LensMatch.zip
